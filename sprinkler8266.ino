@@ -1,6 +1,3 @@
-
-
-
 /*
     Esp8266-12e based irrigation remote unit. modmanpaul@gmail.com. consider it "poorware" if your poor like me it's free, if you got money share a small amount.
     monitor moisture, control solenoid, recieve commands from web connection
@@ -13,13 +10,11 @@
 #include <ESP8266mDNS.h>
 #include <WiFiManager.h>
 #define SERIAL_BAUDRATE                 115200
-const char* ssid = "FiOS-SGVFL";            // Replace with your network credentials
-const char* password = "jib7584rows3699tan";
 MDNSResponder mdns;
 ESP8266WebServer server(80);
 String webPage = "";
 int solenoidPin = 14;
-int serialPrinting = 1;
+int moistPwrPin = 2;
 int moistPin = A0;
 int resetPin = 12;
 int moistureLevel;
@@ -27,6 +22,9 @@ int moistureLevel;
 unsigned long rolltime = millis() + FIVEMIN;
 #define TWENTYHR (1000UL * 60 * 1200)
 unsigned long resetrolltime = millis() + TWENTYHR;
+int serialPrinting = 0;
+
+
 
 void reboot() {
   if ((long)(millis() - resetrolltime) >= 0) {
@@ -39,7 +37,11 @@ void reboot() {
 void moistureSense() {
   if ((long)(millis() - rolltime) >= 0) {
     //  Do your five minute roll stuff here
+  pinMode(moistPwrPin, OUTPUT);
+  digitalWrite(moistPwrPin, HIGH);
     moistureLevel = analogRead(moistPin);
+    delay(500);
+    digitalWrite(moistPwrPin, LOW);
     if (serialPrinting == 1) {
       Serial.println(moistureLevel);
     }
@@ -84,6 +86,7 @@ void setup() {
     webPage = "<h1>Dripper1</h1><p><a href=\"off\"><button>Off</button></a>&nbsp;</p><p><h2>Status: ON</h2><p><p><h2>Moisture is " + String(moistureLevel) + "</h2><p>";
     server.send(200, "text/html", webPage);
     digitalWrite(solenoidPin, HIGH);
+    
     if (serialPrinting == 1) {
       Serial.println("Dripper 1 on");
     }
