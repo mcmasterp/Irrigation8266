@@ -1,5 +1,5 @@
 # Irrigation8266
-esp8266-12e based drip irrigation system based on esp8266-12e devices. goals include scheduling, weather, temp/humidity, and moisture monitoring, auth for controls, OTA updates.
+Drip irrigation control system based on esp8266-12e devices. goals include scheduling, weather, temp/humidity, and moisture monitoring, auth for controls, OTA updates.
 
 Main Controller:
 <ul>
