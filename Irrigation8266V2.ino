@@ -13,7 +13,7 @@
 #define DPRINTLN(...)   //now defines a blank line
 #endif
 
-
+#include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include <DHT_U.h>
@@ -53,9 +53,9 @@ unsigned long rolltime3 = millis() + FIVEMIN3;
 unsigned long rolltime4 = millis() + FIVEMIN4;
 #define TWENTYFOURHR (1000UL * 60 * 1440)
 unsigned long resetrolltime = millis() + TWENTYFOURHR;
-int serialPrinting = 1;
 float h, f, hif;
 String formattedTime;
+int currentHrInt;
 const char* www_username = "mcmasterp";
 const char* www_password = "housedripper1";
 DHT dht(DHTPIN, DHTTYPE);
@@ -65,19 +65,20 @@ ESP8266HTTPUpdateServer httpUpdater;
 MDNSResponder mdns;
 ESP8266WebServer server(80);
 ESP8266WebServer httpServer(8267);
-
-
 WiFiClient client;
 const char* weatherServer = "api.wunderground.com";  // server's address
 const char* resource = "/api/72c48896c1adb75c/conditions/lang:EN/q/zmw:19047.1.99999.json";                    // http resource
 const unsigned long HTTP_TIMEOUT = 10000;  // max respone time from server
 const size_t MAX_CONTENT_SIZE = 512;       // max size of the HTTP response
 const char* current_observation_precip_today_metric;
-long convertedstring;
+long convertedstring = 0L;
+long convertedTempstring;
 struct UserData {
   char precip_today_metric[32];
 };
-
+int eeAddress = 0;   //Location we want the data to be put.
+int onhr, offhr;
+byte onhrb, offhrb;
 
 // Open connection to the HTTP server
 bool connect(const char* hostName) {
@@ -137,7 +138,6 @@ bool readReponseContent(struct UserData* userData) {
   // This is only required if you use StaticJsonBuffer.
   const size_t bufferSize = JSON_OBJECT_SIZE(0) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(2) + 2 * JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(8) + JSON_OBJECT_SIZE(12) + JSON_OBJECT_SIZE(56) + 2250;
 
-  //const char* json = "{\"response\":{\"version\":\"0.1\",\"termsofService\":\"http://www.wunderground.com/weather/api/d/terms.html\",\"features\":{\"conditions\":1}},\"current_observation\":{\"image\":{\"url\":\"http://icons.wxug.com/graphics/wu2/logo_130x80.png\",\"title\":\"Weather Underground\",\"link\":\"http://www.wunderground.com\"},\"display_location\":{\"full\":\"Langhorne, PA\",\"city\":\"Langhorne\",\"state\":\"PA\",\"state_name\":\"Pennsylvania\",\"country\":\"US\",\"country_iso3166\":\"US\",\"zip\":\"19047\",\"magic\":\"1\",\"wmo\":\"99999\",\"latitude\":\"40.18000031\",\"longitude\":\"-74.91000366\",\"elevation\":\"61.0\"},\"observation_location\":{\"full\":\"Highland Park, Levittown, Pennsylvania\",\"city\":\"Highland Park, Levittown\",\"state\":\"Pennsylvania\",\"country\":\"US\",\"country_iso3166\":\"US\",\"latitude\":\"40.165638\",\"longitude\":\"-74.889374\",\"elevation\":\"98 ft\"},\"estimated\":{},\"station_id\":\"KPALEVIT10\",\"observation_time\":\"Last Updated on May 5, 8:14 PM EDT\",\"observation_time_rfc822\":\"Fri, 05 May 2017 20:14:28 -0400\",\"observation_epoch\":\"1494029668\",\"local_time_rfc822\":\"Fri, 05 May 2017 20:14:33 -0400\",\"local_epoch\":\"1494029673\",\"local_tz_short\":\"EDT\",\"local_tz_long\":\"America/New_York\",\"local_tz_offset\":\"-0400\",\"weather\":\"Overcast\",\"temperature_string\":\"66.4 F (19.1 C)\",\"temp_f\":66.4,\"temp_c\":19.1,\"relative_humidity\":\"91%\",\"wind_string\":\"From the SW at 1.8 MPH Gusting to 2.5 MPH\",\"wind_dir\":\"SW\",\"wind_degrees\":233,\"wind_mph\":1.8,\"wind_gust_mph\":\"2.5\",\"wind_kph\":2.9,\"wind_gust_kph\":\"4.0\",\"pressure_mb\":\"998\",\"pressure_in\":\"29.49\",\"pressure_trend\":\"0\",\"dewpoint_string\":\"64 F (18 C)\",\"dewpoint_f\":64,\"dewpoint_c\":18,\"heat_index_string\":\"NA\",\"heat_index_f\":\"NA\",\"heat_index_c\":\"NA\",\"windchill_string\":\"NA\",\"windchill_f\":\"NA\",\"windchill_c\":\"NA\",\"feelslike_string\":\"66.4 F (19.1 C)\",\"feelslike_f\":\"66.4\",\"feelslike_c\":\"19.1\",\"visibility_mi\":\"10.0\",\"visibility_km\":\"16.1\",\"solarradiation\":\"0\",\"UV\":\"0.0\",\"precip_1hr_string\":\"0.00 in ( 0 mm)\",\"precip_1hr_in\":\"0.00\",\"precip_1hr_metric\":\" 0\",\"precip_today_string\":\"1.48 in (38 mm)\",\"precip_today_in\":\"1.48\",\"precip_today_metric\":\"38\",\"icon\":\"cloudy\",\"icon_url\":\"http://icons.wxug.com/i/c/k/nt_cloudy.gif\",\"forecast_url\":\"http://www.wunderground.com/US/PA/Langhorne.html\",\"history_url\":\"http://www.wunderground.com/weatherstation/WXDailyHistory.asp?ID=KPALEVIT10\",\"ob_url\":\"http://www.wunderground.com/cgi-bin/findweather/getForecast?query=40.165638,-74.889374\",\"nowcast\":\"\"}}";
 
   DynamicJsonBuffer jsonBuffer(bufferSize);
 
@@ -152,6 +152,8 @@ bool readReponseContent(struct UserData* userData) {
   JsonObject& current_observation = root["current_observation"];
   current_observation_precip_today_metric = current_observation["precip_today_metric"];
   convertedstring = atol(current_observation_precip_today_metric);
+  const char* current_observation_temp_f = current_observation["temp_f"];
+  convertedTempstring = atol(current_observation_temp_f);
   return true;
 }
 
@@ -163,7 +165,9 @@ void disconnect() {
 
 void printUserData(const struct UserData* userData) {
   DPRINT("Precip: ");
-  DPRINTLN(current_observation_precip_today_metric);
+  DPRINTLN(convertedstring);
+  DPRINT("Temp: ");
+  DPRINTLN(convertedTempstring);
 }
 
 
@@ -213,22 +217,22 @@ void moistureSense() {
 
 void tempSense() {
   if ((long)(millis() - rolltime2) >= 0) {
-    int oldH = h;
-    int oldF = f;
-    h = dht.readHumidity();
+    //int oldH = h;
+    //int oldF = f;
+    //h = dht.readHumidity();
     // Read temperature as Fahrenheit (isFahrenheit = true)
-    f = dht.readTemperature(true);
-    if (isnan(h) || isnan(f)) {
-      h = oldH;
-      f = oldF;
-    }
+    //f = dht.readTemperature(true);
+    //if (isnan(h) || isnan(f)) {
+    //  h = oldH;
+    //  f = oldF;
+    //}
     // Compute heat index in Fahrenheit (the default)
     //hif = dht.computeHeatIndex(f, h);
-    DPRINT("Humidity: ");
-    DPRINT(h);
-    DPRINT(" %\t");
+    //DPRINT("Humidity: ");
+    // DPRINT(h);
+    //DPRINT(" %\t");
     DPRINT("Temperature: ");
-    DPRINT(f);
+    DPRINT(convertedTempstring);
     DPRINT(" *F\t");
     //  DPRINT("Heat index: ");
     //  DPRINT(hif);
@@ -242,14 +246,32 @@ void timeCheck() {
   if ((long)(millis() - rolltime3) >= 0) {
     timeClient.update();
     formattedTime = timeClient.getFormattedTime();
+    //int firstColon = formattedTime.indexOf(':');
+    String currentHr = formattedTime.substring(0, 2);
+    currentHrInt = currentHr.toInt();
     DPRINT("Time: ");
     DPRINTLN(formattedTime);
+    DPRINT("Current Hr: ");
+    DPRINTLN(currentHr);
     rolltime3 += FIVEMIN3;
   }
   delay(200);
 }
 
-
+void runSched() {
+  onhrb = EEPROM.read(1);
+  offhrb = EEPROM.read(2);
+  int onhrbToInt = int(onhrb);
+  if (currentHrInt == onhrbToInt) {
+    if ((convertedstring < 10) && (convertedTempstring > 40)) { // if precipitation today is over 10mm or temp is below 40f
+      digitalWrite(solenoidPin, LOW);
+    }
+  }
+  int offhrbToInt = int(offhrb);
+  if (currentHrInt == offhrbToInt) {
+    digitalWrite(solenoidPin, HIGH);
+  }
+}
 
 void wifiSetup() {
   WiFiManager wifiManager;
@@ -259,9 +281,34 @@ void wifiSetup() {
   }
 }
 
+void runAllAtStart() {
+  timeClient.update();
+  formattedTime = timeClient.getFormattedTime();
+  //int firstColon = formattedTime.indexOf(':');
+  String currentHr = formattedTime.substring(0, 2);
+  currentHrInt = currentHr.toInt();
+  DPRINT("Time: ");
+  DPRINTLN(formattedTime);
+  DPRINT("Current Hr: ");
+  DPRINTLN(currentHr);
 
+
+  if (connect(weatherServer)) {
+    if (sendRequest(weatherServer, resource) && skipResponseHeaders()) {
+      UserData userData;
+      if (readReponseContent(&userData)) {
+        printUserData(&userData);
+      }
+    }
+  }
+
+  DPRINT("Temperature: ");
+  DPRINT(convertedTempstring);
+  DPRINT(" *F\t");
+}
 
 void setup() {
+
   Serial.begin(SERIAL_BAUDRATE);
   dht.begin();
   timeClient.begin();
@@ -301,9 +348,54 @@ void setup() {
   if (mdns.begin("dripperhub", WiFi.localIP())) {
     DPRINTLN("MDNS responder started");
   }
-
+  EEPROM.begin(4);
   server.begin();
   DPRINTLN("HTTP server started");
+
+  onhrb = EEPROM.read(1);
+  offhrb = EEPROM.read(2);
+  DPRINT("On Time: ");
+  DPRINTLN(onhrb);
+  DPRINT("Off Time: ");
+  DPRINTLN(offhrb);
+
+  runAllAtStart();
+
+  server.on("/post", []() {
+    valveStatus = digitalRead(solenoidPin);
+    if (valveStatus == 1) {
+      valveState = "Closed";
+    }
+    else if (valveStatus == 0) {
+      valveState = "Open";
+    }
+    if (server.args() > 0 ) {
+      for ( uint8_t i = 0; i < server.args(); i++ ) {
+        if (server.argName(i) == "onhr") {
+          onhr = server.arg(i).toInt();
+          EEPROM.write(1, onhr);
+          DPRINTLN(onhr);
+        }
+        if (server.argName(i) == "offhr") {
+          offhr = server.arg(i).toInt();
+          EEPROM.write(2, offhr);
+          DPRINTLN(offhr);
+        }
+      }
+      EEPROM.commit();
+    }
+    webPage = "<h1>DripperHub</h1>";
+    webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
+    webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
+    webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
+    //webPage += "<p><h2>Moisture is " + String(soil) + "%</h2></p>";
+    webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
+    webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
+    webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    server.send(200, "text/html", webPage);
+
+  });
 
   server.on("/", []() {
     valveStatus = digitalRead(solenoidPin);
@@ -313,15 +405,22 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1><p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p><p><a href=\"forceopen\"><button>Force Open</button></a></p><p><h2>Main Valve: " + String(valveState) + "</h2></p><p><h2>Moisture is " + String(soil) + "%</h2></p><p><h2>Temp is " + String(f) + "F</h2></p><p><h2>Time: " + String(formattedTime) + "</h2></p><p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-
-      server.send(200, "text/html", webPage);
+    webPage = "<h1>DripperHub</h1>";
+    webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
+    webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
+    webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
+    //webPage += "<p><h2>Moisture is " + String(soil) + "%</h2></p>";
+    webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
+    webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
+    webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    server.send(200, "text/html", webPage);
 
   });
 
   server.on("/open", []() {
-    
-    if (convertedstring <= 10 && f >= 40) { // if precipitation today is over 10mm or temp is below 40f
+
+    if ((convertedstring < 10) && (convertedTempstring > 40)) { // if precipitation today is over 10mm or temp is below 40f
       digitalWrite(solenoidPin, LOW);
     }
     valveStatus = digitalRead(solenoidPin);
@@ -331,7 +430,15 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1><p><a href=\"close\"><button>Close</button></a>&nbsp;</p><p><h2>Main Valve: " + String(valveState) + "</h2></p><p><h2>Moisture is " + String(soil) + "</h2></p><p><h2>Temp is " + String(f) + "</h2></p><p><h2>Time: " + String(formattedTime) + "</h2></p><p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage = "<h1>DripperHub</h1>";
+    webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
+    webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
+    webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
+    //webPage += "<p><h2>Moisture is " + String(soil) + "%</h2></p>";
+    webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
+    webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
+    webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -340,9 +447,9 @@ void setup() {
     }
     DPRINTLN("Main Valve Open");
   });
-    server.on("/forceopen", []() {
+  server.on("/forceopen", []() {
 
-      digitalWrite(solenoidPin, LOW);
+    digitalWrite(solenoidPin, LOW);
     valveStatus = digitalRead(solenoidPin);
     if (valveStatus == 1) {
       valveState = "Closed";
@@ -350,7 +457,15 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1><p><a href=\"close\"><button>Close</button></a>&nbsp;</p><p><h2>Main Valve: " + String(valveState) + "</h2></p><p><h2>Moisture is " + String(soil) + "</h2></p><p><h2>Temp is " + String(f) + "</h2></p><p><h2>Time: " + String(formattedTime) + "</h2></p><p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage = "<h1>DripperHub</h1>";
+    webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
+    webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
+    webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
+    //webPage += "<p><h2>Moisture is " + String(soil) + "%</h2></p>";
+    webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
+    webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
+    webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -369,7 +484,15 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1><p><a href=\"open\"><button>Open</button></a>&nbsp;</p><p><a href=\"forceopen\"><button>Force Open</button></a></p><p><h2>Main Valve: " + String(valveState) + "</h2></p><p><h2>Moisture is " + String(soil) + "</h2></p><p><h2>Temp is " + String(f) + "</h2><p><p><h2>Time: " + String(formattedTime) + "</h2></p><p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage = "<h1>DripperHub</h1>";
+    webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
+    webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
+    webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
+    //webPage += "<p><h2>Moisture is " + String(soil) + "%</h2></p>";
+    webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
+    webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
+    webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
+    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -393,16 +516,16 @@ void setup() {
   });
 
   server.on("/temp", []() {
-    webPage = f;
+    webPage = convertedTempstring;
     server.send(200, "text/html", webPage);
     DPRINTLN("temp read");
   });
 
-  server.on("/humidity", []() {
-    webPage = h;
-    server.send(200, "text/html", webPage);
-    DPRINTLN("humidity read");
-  });
+  //server.on("/humidity", []() {
+  //  webPage = h;
+  //  server.send(200, "text/html", webPage);
+  //  DPRINTLN("humidity read");
+  //});
 
   server.on("/time", []() {
     webPage = formattedTime;
@@ -411,19 +534,17 @@ void setup() {
   });
 
 
-moistureSense();
-  tempSense();
-  timeCheck();
-  wunderget();
+
 }
 void loop() {
   ArduinoOTA.handle();
   server.handleClient();
   httpServer.handleClient();
-  moistureSense();
-  tempSense();
+  //moistureSense();
   timeCheck();
   wunderget();
+  tempSense();
+  runSched();
   reboot();
 }
 
