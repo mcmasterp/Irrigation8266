@@ -275,10 +275,9 @@ void runSched() {
 
 void wifiSetup() {
   WiFiManager wifiManager;
+  WiFi.hostname("DripperHub");
+  wifi_station_set_hostname("DripperHub");
   wifiManager.autoConnect("dripperhubsetupAP", "password");
-  if (WiFi.status() == WL_CONNECTED) {
-    WiFi.hostname("DripperHub");
-  }
 }
 
 void runAllAtStart() {
@@ -361,7 +360,7 @@ void setup() {
 
   runAllAtStart();
 
-  server.on("/post", []() {
+  server.on("/post43ge5eeg7h53", []() {
     valveStatus = digitalRead(solenoidPin);
     if (valveStatus == 1) {
       valveState = "Closed";
@@ -384,7 +383,7 @@ void setup() {
       }
       EEPROM.commit();
     }
-    webPage = "<h1>DripperHub</h1>";
+    webPage = "<body style='width:100%;'><h1><a href=\"\">DripperHub</a></h1>";
     webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
     webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
     webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
@@ -392,7 +391,9 @@ void setup() {
     webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
     webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
     webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<h1>Dripper schedule</h1><h3>(24 Hour Clock)</h3><p>On at: " + String(onhrb) + ":00Hrs</p><p>Off at: " + String(offhrb) + ":00Hrs</p>";
+    webPage += "<form id='form_30320' method='post' action='/post43ge5eeg7h53'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<p><a href=\"reboot\"><button>Reboot Hub</button></a>      <a href=\"http://dripperhub:8267/update\"><button>Update Firmware</button></a>&nbsp;</p></body>";
     server.send(200, "text/html", webPage);
 
   });
@@ -405,7 +406,7 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1>";
+    webPage = "<body style='width:100%;'><h1><a href=\"\">DripperHub</a></h1>";
     webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
     webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
     webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
@@ -413,9 +414,15 @@ void setup() {
     webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
     webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
     webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
-    server.send(200, "text/html", webPage);
-
+    webPage += "<h1>Dripper schedule</h1><h3>(24 Hour Clock)</h3><p>On at: " + String(onhrb) + ":00Hrs</p><p>Off at: " + String(offhrb) + ":00Hrs</p>";
+    webPage += "<form id='form_30320' method='post' action='/post43ge5eeg7h53'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<p><a href=\"reboot\"><button>Reboot Hub</button></a>      <a href=\"http://dripperhub:8267/update\"><button>Update Firmware</button></a>&nbsp;</p></body>";
+    if (!server.authenticate(www_username, www_password)) {
+      return server.requestAuthentication();
+    }
+    else {
+      server.send(200, "text/html", webPage);
+    }
   });
 
   server.on("/open", []() {
@@ -430,7 +437,7 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1>";
+    webPage = "<body style='width:100%;'><h1><a href=\"\">DripperHub</a></h1>";
     webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
     webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
     webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
@@ -438,7 +445,9 @@ void setup() {
     webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
     webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
     webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<h1>Dripper schedule</h1><h3>(24 Hour Clock)</h3><p>On at: " + String(onhrb) + ":00Hrs</p><p>Off at: " + String(offhrb) + ":00Hrs</p>";
+    webPage += "<form id='form_30320' method='post' action='/post43ge5eeg7h53'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<p><a href=\"reboot\"><button>Reboot Hub</button></a>      <a href=\"http://dripperhub:8267/update\"><button>Update Firmware</button></a>&nbsp;</p></body>";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -457,7 +466,7 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1>";
+    webPage = "<body style='width:100%;'><h1><a href=\"\">DripperHub</a></h1>";
     webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
     webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
     webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
@@ -465,7 +474,9 @@ void setup() {
     webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
     webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
     webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<h1>Dripper schedule</h1><h3>(24 Hour Clock)</h3><p>On at: " + String(onhrb) + ":00Hrs</p><p>Off at: " + String(offhrb) + ":00Hrs</p>";
+    webPage += "<form id='form_30320' method='post' action='/post43ge5eeg7h53'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<p><a href=\"reboot\"><button>Reboot Hub</button></a>      <a href=\"http://dripperhub:8267/update\"><button>Update Firmware</button></a>&nbsp;</p></body>";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -484,7 +495,7 @@ void setup() {
     else if (valveStatus == 0) {
       valveState = "Open";
     }
-    webPage = "<h1>DripperHub</h1>";
+    webPage = "<body style='width:100%;'><h1><a href=\"\">DripperHub</a></h1>";
     webPage += "<p><a href=\"close\"><button>Close</button></a> <a href=\"open\"><button>Open</button></a>&nbsp;</p>";
     webPage += "<p><a href=\"forceopen\"><button>Force Open</button></a></p>";
     webPage += "<p><h2>Main Valve: " + String(valveState) + "</h2></p>";
@@ -492,7 +503,9 @@ void setup() {
     webPage += "<p><h2>Temp is " + String(convertedTempstring) + "F</h2></p>";
     webPage += "<p><h2>Time: " + String(formattedTime) + "</h2></p>";
     webPage += "<p><h2>Rain Today: " + String(convertedstring) + "mm</h2></p>";
-    webPage += "<form id='form_30320' method='post' action='/post'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<h1>Dripper schedule</h1><h3>(24 Hour Clock)</h3><p>On at: " + String(onhrb) + ":00Hrs</p><p>Off at: " + String(offhrb) + ":00Hrs</p>";
+    webPage += "<form id='form_30320' method='post' action='/post43ge5eeg7h53'><h2>Set Dripper schedule</h2><ul><li><label>On Time HR</label><input id='onhr' name='onhr'type='text' maxlength='2' value=''/></li><li><label>Off Time HR</label><input id='offhr' name='offhr'type='text' maxlength='2' value=''/></li><li><input type='hidden' name='form_id' value='30320' /><input id='saveForm' type='submit' name='submit' value='Submit' /></li></ul></form>  ";
+    webPage += "<p><a href=\"reboot\"><button>Reboot Hub</button></a>      <a href=\"http://dripperhub:8267/update\"><button>Update Firmware</button></a>&nbsp;</p></body>";
     if (!server.authenticate(www_username, www_password)) {
       return server.requestAuthentication();
     }
@@ -533,7 +546,17 @@ void setup() {
     DPRINTLN("time read");
   });
 
-
+  server.on("/reboot", []() {
+    webPage = "<body style='width:100%;'><meta http-equiv=\"refresh\" content=\"30;url=http://mcmasterhouse.zapto.org:1945\"><h1>Rebooting.......</h1><p>UI will refresh in 30 seconds or you can click the botton to refresh now.</p><p><a href=\"\"><button>Refresh</button></a></p></body>";
+    if (!server.authenticate(www_username, www_password)) {
+      return server.requestAuthentication();
+    }
+    else {
+      server.send(200, "text/html", webPage);
+      ESP.restart();
+    }
+    DPRINTLN("time read");
+  });
 
 }
 void loop() {
